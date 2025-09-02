@@ -47,14 +47,14 @@ chmod +x interstice.sh
 ```
 
 When the build finishes, you’ll have an ISO image:  
-**`live-image-amd64.hybrid.iso`**
+`live-image-amd64.hybrid.iso`
 
 ---
 
 ## 💻 Running Interstice
 
 - Boot from the ISO (in a VM or on hardware).  
-- The system logs in automatically as user **`interstice`**.  
+- The system logs in automatically as user `interstice`.  
 - Firefox launches in **kiosk mode**, pointing to `http://localhost:3000`.  
 - The Next.js app runs as a **systemd service**.  
 
