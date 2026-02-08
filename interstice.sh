@@ -1,118 +1,109 @@
 #!/bin/bash
 set -e
 
-# === Config ===
-DISTRO="bookworm" # Debian 12
-APP_NAME="interstice"
+DISTRO=bookworm
+ISO_NAME=interstice
+USER=interstice
 
-# === Clean any old build ===
-sudo lb clean
+echo "[*] Installing build dependencies"
+sudo apt update
+sudo apt install -y \
+  live-build \
+  debootstrap \
+  squashfs-tools \
+  xorriso \
+  isolinux \
+  syslinux \
+  python3
 
-# === Configure live-build ===
+echo "[*] Cleaning old build"
+sudo lb clean || true
+rm -rf config
+
+echo "[*] Configuring live-build"
 lb config \
-  --distribution "$DISTRO" \
-  --debian-installer live \
-  --archive-areas "main contrib non-free" \
-  --binary-images iso-hybrid
+  --distribution $DISTRO \
+  --binary-images iso-hybrid \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --bootappend-live "boot=live components username=$USER"
 
-# === Package list ===
-mkdir -p config/package-lists
-cat > config/package-lists/${APP_NAME}.list.chroot <<'EOF'
-lightdm
-xserver-xorg
-xinit
-firefox-esr
-network-manager
-sudo
-git
-curl
-ca-certificates
-nodejs
-npm
-lxterminal
-EOF
-
-# === Autologin setup ===
-mkdir -p config/includes.chroot/etc/lightdm
-cat > config/includes.chroot/etc/lightdm/lightdm.conf <<'EOF'
-[Seat:*]
-autologin-user=interstice
-autologin-user-timeout=0
-user-session=interstice
-EOF
-
-# === Create interstice user ===
-mkdir -p config/includes.chroot/etc/skel
-mkdir -p config/includes.chroot/usr/share/xsessions
-cat > config/includes.chroot/usr/share/xsessions/interstice.desktop <<'EOF'
-[Desktop Entry]
-Name=Interstice
-Comment=Interstice Kiosk Session
-Exec=startx
-Type=Application
-EOF
-
-# === X init to launch Firefox kiosk ===
-mkdir -p config/includes.chroot/etc/skel
-cat > config/includes.chroot/etc/skel/.xinitrc <<'EOF'
-#!/bin/bash
-# Start Interstice frontend
-while true; do
-  firefox --kiosk http://localhost:3000
-done
-EOF
-chmod +x config/includes.chroot/etc/skel/.xinitrc
-
-# === Systemd service for Next.js app ===
+echo "[*] Creating directory structure"
+mkdir -p config/includes.chroot/opt/interstice/ui
+mkdir -p config/includes.chroot/opt/interstice/api
 mkdir -p config/includes.chroot/etc/systemd/system
-cat > config/includes.chroot/etc/systemd/system/interstice.service <<'EOF'
+mkdir -p config/includes.chroot/etc/lightdm
+mkdir -p config/includes.chroot/home/$USER
+
+echo "[*] Copying UI files"
+cp -r ui/* config/includes.chroot/opt/interstice/ui/
+
+echo "[*] Copying API server"
+cp api/server.py config/includes.chroot/opt/interstice/api/server.py
+
+echo "[*] Creating systemd service: Interstice API"
+cat > config/includes.chroot/etc/systemd/system/interstice-api.service <<EOF
 [Unit]
-Description=Interstice Next.js App
+Description=Interstice Local API
 After=network.target
 
 [Service]
-WorkingDirectory=/home/interstice/${APP_NAME}
-ExecStart=/usr/bin/npm start
+ExecStart=/usr/bin/python3 /opt/interstice/api/server.py
 Restart=always
-User=interstice
-Environment=NODE_ENV=production
+User=root
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# === Graphical Terminal desktop entry ===
-mkdir -p config/includes.chroot/usr/share/applications
-cat > config/includes.chroot/usr/share/applications/lxterminal.desktop <<'EOF'
-[Desktop Entry]
-Name=Terminal
-Comment=Open a terminal window
-Exec=lxterminal
-Icon=utilities-terminal
-Terminal=false
-Type=Application
-Categories=System;Utility;TerminalEmulator;
+echo "[*] Creating systemd service: Interstice UI Server"
+cat > config/includes.chroot/etc/systemd/system/interstice-ui.service <<EOF
+[Unit]
+Description=Interstice UI Server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 3000
+WorkingDirectory=/opt/interstice/ui
+Restart=always
+User=$USER
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
-# === Mode switch scripts ===
-mkdir -p config/includes.chroot/usr/local/bin
-cat > config/includes.chroot/usr/local/bin/set-prod-mode.sh <<'EOF'
-#!/bin/bash
-sudo sed -i 's/NODE_ENV=.*/NODE_ENV=production/' /etc/systemd/system/interstice.service
-sudo systemctl daemon-reexec
-sudo systemctl restart interstice
-echo "Switched Interstice to PRODUCTION mode."
-EOF
-chmod +x config/includes.chroot/usr/local/bin/set-prod-mode.sh
+echo "[*] Enabling systemd services"
+mkdir -p config/includes.chroot/etc/systemd/system/multi-user.target.wants
+ln -s /etc/systemd/system/interstice-api.service \
+  config/includes.chroot/etc/systemd/system/multi-user.target.wants/interstice-api.service
+ln -s /etc/systemd/system/interstice-ui.service \
+  config/includes.chroot/etc/systemd/system/multi-user.target.wants/interstice-ui.service
 
-cat > config/includes.chroot/usr/local/bin/set-dev-mode.sh <<'EOF'
-#!/bin/bash
-sudo sed -i 's/NODE_ENV=.*/NODE_ENV=development/' /etc/systemd/system/interstice.service
-sudo systemctl daemon-reexec
-sudo systemctl restart interstice
-echo "Switched Interstice to DEVELOPMENT mode."
+echo "[*] Configuring LightDM autologin"
+cat > config/includes.chroot/etc/lightdm/lightdm.conf <<EOF
+[Seat:*]
+autologin-user=$USER
+autologin-session=openbox
 EOF
-chmod +x config/includes.chroot/usr/local/bin/set-dev-mode.sh
 
-# === Build ISO ===
+echo "[*] Creating kiosk startup (.xinitrc)"
+cat > config/includes.chroot/home/$USER/.xinitrc <<EOF
+#!/bin/sh
+exec firefox --kiosk --no-remote --private-window http://localhost:3000
+EOF
+chmod +x config/includes.chroot/home/$USER/.xinitrc
+
+echo "[*] Defining package list (NO TERMINAL)"
+mkdir -p config/package-lists
+cat > config/package-lists/interstice.list.chroot <<EOF
+xorg
+openbox
+lightdm
+firefox-esr
+python3
+python3-flask
+EOF
+
+echo "[*] Building ISO"
 sudo lb build
+
+echo "[✓] Interstice ISO build complete"
