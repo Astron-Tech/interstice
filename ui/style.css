@@ -1,0 +1,91 @@
+* {
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0b0d10;
+  color: #e6e6e6;
+  height: 100%;
+}
+
+#shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+header {
+  padding: 16px 24px;
+  background: #12151a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1e222a;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+#status {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  padding: 24px;
+  flex: 1;
+}
+
+.panel {
+  background: #12151a;
+  border: 1px solid #1e222a;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.panel h2 {
+  margin-top: 0;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  background: #1e222a;
+  border: 1px solid #2a2f3a;
+  color: #e6e6e6;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #2a2f3a;
+}
+
+.panel.danger button {
+  border-color: #402020;
+}
+
+.panel.danger button:hover {
+  background: #402020;
+}
+
+.panel.output pre {
+  background: #0b0d10;
+  border: 1px solid #1e222a;
+  padding: 12px;
+  height: 160px;
+  overflow: auto;
+  font-size: 12px;
+}
