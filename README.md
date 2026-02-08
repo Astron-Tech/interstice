@@ -1,43 +1,142 @@
 # Interstice
 
-**Interstice** is a custom Linux distribution built with Debian Live, designed to boot straight into a [Next.js](https://nextjs.org/) + React app running in kiosk mode.  
-It ships with Firefox fullscreen, a graphical terminal (`lxterminal`), autologin, and simple scripts to switch between **production** and **development** modes.
+**Interstice** is a custom Debian-based Linux distribution designed as a **browser-first operating system**.  
+It boots directly into a fullscreen Firefox kiosk that renders a **static HTML interface**, backed by a **local API** capable of executing whitelisted shell commands.
+
+There is **no desktop environment**, **no terminal**, and **no JavaScript framework**.  
+The UI *is* the OS.
+
+---
+
+## 🧠 Architecture Overview
+
+Interstice is composed of three runtime layers:
+
+1. **Static Web UI**
+   - Plain HTML, CSS, and JavaScript
+   - Served locally via a lightweight web server
+   - Rendered in Firefox kiosk mode
+
+2. **Local API Daemon**
+   - Runs on `localhost`
+   - Accepts HTTP requests
+   - Executes **whitelisted shell commands only**
+   - Acts as the bridge between the UI and the OS
+
+3. **Linux Base System**
+   - Debian Live (Bookworm)
+   - Autologin
+   - No graphical terminal
+   - No traditional desktop
 
 ---
 
 ## 🚀 Features
-- **Next.js/React app** served locally at `http://localhost:3000`  
-- **Firefox in kiosk mode** as the UI layer  
-- **Autologin** to user `interstice`  
-- **Systemd service** to run the app  
-- **Mode switching scripts**:
-  - `set-prod-mode.sh` → runs production (`NODE_ENV=production`)
-  - `set-dev-mode.sh` → runs development (`NODE_ENV=development`)
-- **Graphical terminal** (`lxterminal`) for easy shell access  
+
+- Static HTML-based operating system UI
+- Firefox ESR in locked kiosk mode
+- Local web server (`python3 -m http.server`)
+- Local API for system control (Python + Flask)
+- Autologin on boot
+- No Node.js, no React, no Next.js
+- Designed for kiosks, appliances, and embedded systems
 
 ---
 
-## 📦 Requirements
+## 📦 Build Requirements
 
-To build Interstice, you’ll need:  
-- Debian/Ubuntu-based host system  
-- Installed tools:  
-  - `live-build`  
-  - `debootstrap`  
-  - `sudo`  
-  - `git`  
+To build the Interstice ISO, you need a Debian/Ubuntu-based system with:
 
-Install with:  
+- `live-build`
+- `debootstrap`
+- `python3`
+- `git`
+- `sudo`
+
+Install dependencies:
+
 ```bash
 sudo apt update
-sudo apt install live-build debootstrap git sudo
+sudo apt install live-build debootstrap git python3 sudo
 ```
 
 ---
 
-## 🔨 Build ISO
+## 📁 Repository Layout
 
-Clone the repo and run the build script:
+```
+interstice/
+├── interstice.sh        # ISO build script
+├── ui/                 # Static HTML UI (served to Firefox)
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
+├── api/                # Local system API
+│   └── server.py
+└── README.md
+```
+
+---
+
+## 📥 Adding Your UI
+
+The `ui/` directory contains your operating system interface.
+
+Example:
+
+```
+ui/
+├── index.html
+├── style.css
+└── app.js
+```
+
+These files will be copied into the ISO at:
+
+```
+/opt/interstice/ui
+```
+
+They are served at:
+
+```
+http://localhost:3000
+```
+
+---
+
+## 🔌 Local API (System Control)
+
+Interstice includes a local API daemon that:
+
+- Runs on `http://127.0.0.1:9999`
+- Accepts JSON requests
+- Executes **only predefined commands**
+- Runs as root
+
+### Example API request (from `app.js`):
+
+```js
+fetch("http://localhost:9999/run", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ command: "reboot" })
+});
+```
+
+### Example allowed commands:
+- `reboot`
+- `shutdown`
+- `uptime`
+- `hostname`
+
+Commands are **hardcoded and whitelisted** for safety.
+
+---
+
+## 🔨 Building the ISO
+
+Clone the repository and run the build script:
 
 ```bash
 git clone https://github.com/yourusername/interstice.git
@@ -46,136 +145,69 @@ chmod +x interstice.sh
 ./interstice.sh
 ```
 
-When the build finishes, you’ll have an ISO image:  
-`live-image-amd64.hybrid.iso`
+When the build completes, you will get:
+
+```
+live-image-amd64.hybrid.iso
+```
+
+This is a bootable ISO.
 
 ---
 
-## 💻 Running Interstice
+## 💻 Boot Behavior
 
-- Boot from the ISO (in a VM or on hardware).  
-- The system logs in automatically as user `interstice`.  
-- Firefox launches in **kiosk mode**, pointing to `http://localhost:3000`.  
-- The Next.js app runs as a **systemd service**.  
+When Interstice boots:
 
----
-
-## ⚙️ Switching Modes
-
-Inside the running system, use the provided scripts:  
-
-```bash
-# Switch to production mode (default)
-set-prod-mode.sh
-
-# Switch to development mode
-set-dev-mode.sh
-```
+1. Linux starts
+2. User `interstice` logs in automatically
+3. systemd starts:
+   - the local API daemon
+   - the static web server
+4. Firefox launches in fullscreen kiosk mode
+5. `http://localhost:3000` loads
+6. Your HTML UI becomes the operating system
 
 ---
 
-## 🖥️ Accessing the Terminal
+## 🖥️ Terminal Access
 
-Interstice ships with **lxterminal** for graphical shell access.  
+Interstice **does not include a graphical terminal**.
 
-- Press **Alt+F2**, type `lxterminal`, press Enter.  
-- Or open it from the app menu.  
-- You can also switch to a text TTY with **Ctrl+Alt+F2**.  
+- No terminal emulator is installed
+- No desktop menu exists
+- System control is done **only through the API**
 
----
-
-## 📥 Adding Your Next.js App
-
-By default, Interstice looks for your app in:  
-`/home/interstice/interstice`
-
-### Step 1 — Make the App Directory
-Before running the build script, create this path in your repo:
-
-```bash
-mkdir -p config/includes.chroot/home/interstice/interstice
-```
-
-### Step 2 — Copy Your Project
-Place your Next.js project inside that folder, for example:
-
-```
-config/includes.chroot/home/interstice/interstice/package.json
-config/includes.chroot/home/interstice/interstice/pages/index.js
-```
-
-When the ISO builds, it will appear inside the live system at:
-
-```
-/home/interstice/interstice
-```
-
-### Step 3 — Dependencies Installed Automatically
-During the ISO build, the script runs:
-
-```bash
-cd /home/interstice/interstice && npm install
-```
-
-so your app’s dependencies are ready on first boot.
-
-### Step 4 — Build for Production
-Inside Interstice, run:
-
-```bash
-cd ~/interstice
-npm run build
-```
-
-The systemd service will serve your app at `http://localhost:3000`.
+Text TTYs technically exist at the kernel level, but the system is designed to operate without user shell access.
 
 ---
 
-## 🛠️ Development Workflow
+## 🔐 Security Model
 
-1. Boot Interstice  
-2. Open a terminal (`lxterminal`)  
-3. Switch to dev mode:
-   ```bash
-   set-dev-mode.sh
-   ```
-4. Run the Next.js dev server:
-   ```bash
-   cd ~/interstice
-   npm run dev
-   ```
-   Your app now hot-reloads changes.  
+- API is bound to `127.0.0.1`
+- Commands are hardcoded (no user-provided shell input)
+- No `shell=true`
+- No exposed network services
+- UI cannot directly execute commands
 
-When done, switch back with:  
-```bash
-set-prod-mode.sh
-```
+This design is suitable for kiosks, appliances, and locked-down systems.
 
 ---
 
-## 📂 Repo Structure
+## 🧭 What Interstice Is (and Is Not)
 
-```
-.
-├── interstice.sh                   # Build script (creates ISO)
-├── config/
-│   ├── package-lists/
-│   │   └── interstice.list.chroot  # Required packages
-│   ├── includes.chroot/
-│   │   ├── etc/
-│   │   │   ├── lightdm/lightdm.conf
-│   │   │   ├── skel/.xinitrc
-│   │   │   └── systemd/system/interstice.service
-│   │   └── usr/
-│   │       ├── share/applications/lxterminal.desktop
-│   │       └── local/bin/
-│   │           ├── set-prod-mode.sh
-│   │           └── set-dev-mode.sh
-│   └── includes.chroot/home/interstice/interstice/   # Your Next.js app here
-└── README.md
-```
+### Interstice **is**:
+- A browser-based operating system
+- A kiosk / appliance OS
+- A static HTML-powered shell
+
+### Interstice **is not**:
+- A desktop Linux distro
+- A development environment
+- A web app framework
 
 ---
 
 ## 📜 License
+
 MIT License © 2025 Astron
