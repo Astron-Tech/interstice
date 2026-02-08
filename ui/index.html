@@ -1,1 +1,38 @@
-<h1>Interstice Test</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Interstice</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="shell">
+    <header>
+      <h1>Interstice</h1>
+      <span id="status">online</span>
+    </header>
+
+    <main>
+      <div class="panel">
+        <h2>System</h2>
+        <button onclick="run('uptime')">Uptime</button>
+        <button onclick="run('hostname')">Hostname</button>
+      </div>
+
+      <div class="panel danger">
+        <h2>Power</h2>
+        <button onclick="run('reboot')">Reboot</button>
+        <button onclick="run('shutdown')">Shutdown</button>
+      </div>
+
+      <div class="panel output">
+        <h2>Output</h2>
+        <pre id="output">Waiting for command…</pre>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
